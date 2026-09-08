@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/useAuth'
 
@@ -159,7 +160,12 @@ export default function ProjectListPage() {
             <ul className="space-y-3">
               {projects.map((project) => (
                 <li key={project.id} className="rounded-md border border-neutral-200 px-4 py-3">
-                  <p className="font-medium">{project.name}</p>
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="font-medium text-neutral-900 underline-offset-4 hover:underline"
+                  >
+                    {project.name}
+                  </Link>
                   <p className="mt-1 text-sm text-neutral-600">
                     Created {new Date(project.created_at).toLocaleDateString()}
                   </p>

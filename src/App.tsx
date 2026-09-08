@@ -3,6 +3,7 @@ import AuthProvider from './auth/AuthProvider'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import ProjectListPage from './pages/ProjectListPage'
+import ProjectWorkspacePage from './pages/ProjectWorkspacePage'
 
 export default function App() {
   return (
@@ -16,6 +17,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProjectListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:projectId"
+            element={
+              <ProtectedRoute>
+                <ProjectWorkspacePage />
               </ProtectedRoute>
             }
           />
