@@ -34,6 +34,16 @@ type CreationEvent = {
   created_at: string
 }
 
+type AssetRelation = {
+  id: string
+  from_asset_id: string
+  to_asset_id: string
+  relation_type: string
+  created_at: string
+}
+
+const DERIVED_FROM_RELATION_TYPE = 'derived_from'
+
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams()
   const { user } = useAuth()
@@ -54,6 +64,14 @@ export default function ProjectWorkspacePage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [downloadPendingId, setDownloadPendingId] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [relations, setRelations] = useState<AssetRelation[]>([])
+  const [relationsLoading, setRelationsLoading] = useState(true)
+  const [relationsError, setRelationsError] = useState<string | null>(null)
+  const [isAddingRelation, setIsAddingRelation] = useState(false)
+  const [derivedAssetId, setDerivedAssetId] = useState('')
+  const [sourceAssetId, setSourceAssetId] = useState('')
+  const [creatingRelation, setCreatingRelation] = useState(false)
+  const [relationCreateError, setRelationCreateError] = useState<string | null>(null)
 
   const loadAssets = useCallback(async (active = true) => {
     if (!projectId) return []
@@ -112,6 +130,31 @@ export default function ProjectWorkspacePage() {
     setTimelineLoading(false)
   }, [])
 
+  const loadRelations = useCallback(async (active = true) => {
+    if (!projectId) return []
+
+    setRelationsLoading(true)
+    setRelationsError(null)
+
+    const { data, error } = await supabase
+      .from('asset_relations')
+      .select('id, from_asset_id, to_asset_id, relation_type, created_at')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (!active) return []
+
+    if (error) {
+      setRelationsError(error.message)
+      setRelationsLoading(false)
+      return []
+    }
+
+    setRelations(data)
+    setRelationsLoading(false)
+    return data
+  }, [projectId])
+
   useEffect(() => {
     let active = true
 
@@ -121,6 +164,7 @@ export default function ProjectWorkspacePage() {
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
+        setRelationsLoading(false)
         return
       }
 
@@ -140,6 +184,7 @@ export default function ProjectWorkspacePage() {
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
+        setRelationsLoading(false)
         return
       }
 
@@ -148,6 +193,7 @@ export default function ProjectWorkspacePage() {
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
+        setRelationsLoading(false)
         return
       }
 
@@ -156,6 +202,7 @@ export default function ProjectWorkspacePage() {
 
       const currentAssets = await loadAssets(active)
       await loadTimeline(currentAssets, active)
+      await loadRelations(active)
     }
 
     void loadWorkspace()
@@ -163,7 +210,7 @@ export default function ProjectWorkspacePage() {
     return () => {
       active = false
     }
-  }, [loadAssets, loadTimeline, projectId])
+  }, [loadAssets, loadTimeline, loadRelations, projectId])
 
   async function refreshAssetsAndTimeline() {
     const currentAssets = await loadAssets()
@@ -267,6 +314,44 @@ export default function ProjectWorkspacePage() {
 
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
     setDownloadPendingId(null)
+  }
+
+  async function handleCreateRelation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!projectId || creatingRelation) return
+    if (!derivedAssetId || !sourceAssetId || derivedAssetId === sourceAssetId) return
+
+    setCreatingRelation(true)
+    setRelationCreateError(null)
+
+    const { error } = await supabase.from('asset_relations').insert({
+      project_id: projectId,
+      from_asset_id: derivedAssetId,
+      to_asset_id: sourceAssetId,
+      relation_type: DERIVED_FROM_RELATION_TYPE,
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        setRelationCreateError('This relation already exists.')
+      } else if (error.code === '23514') {
+        setRelationCreateError('An asset cannot be related to itself.')
+      } else if (error.message.includes('same project')) {
+        setRelationCreateError('Assets must belong to the same project.')
+      } else {
+        setRelationCreateError(error.message)
+      }
+      setCreatingRelation(false)
+      return
+    }
+
+    await loadRelations()
+
+    setDerivedAssetId('')
+    setSourceAssetId('')
+    setIsAddingRelation(false)
+    setCreatingRelation(false)
   }
 
   const assetNamesById = new Map(assets.map((asset) => [asset.id, asset.name]))
@@ -437,6 +522,125 @@ export default function ProjectWorkspacePage() {
                       </li>
                     ))}
                   </ol>
+                )}
+              </div>
+            </section>
+
+            <section className="mt-12">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium">Relations</h2>
+                {assets.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingRelation(true)
+                      setRelationCreateError(null)
+                    }}
+                    className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
+                  >
+                    Add Relation
+                  </button>
+                )}
+              </div>
+
+              {assets.length < 2 && (
+                <p className="mt-4 text-neutral-600">At least two assets are required to create a relation.</p>
+              )}
+
+              {isAddingRelation && assets.length >= 2 && (
+                <form
+                  onSubmit={handleCreateRelation}
+                  className="mt-4 max-w-xl rounded-md border border-neutral-200 p-4"
+                >
+                  <div>
+                    <label htmlFor="derived-asset" className="text-sm font-medium text-neutral-700">
+                      Derived Asset
+                    </label>
+                    <select
+                      id="derived-asset"
+                      value={derivedAssetId}
+                      onChange={(event) => setDerivedAssetId(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select asset...</option>
+                      {assets.map((asset) => (
+                        <option key={asset.id} value={asset.id} disabled={asset.id === sourceAssetId}>
+                          {asset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="mt-3 text-sm text-neutral-600">derived from</p>
+                  <div className="mt-3">
+                    <label htmlFor="source-asset" className="text-sm font-medium text-neutral-700">
+                      Source Asset
+                    </label>
+                    <select
+                      id="source-asset"
+                      value={sourceAssetId}
+                      onChange={(event) => setSourceAssetId(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select asset...</option>
+                      {assets.map((asset) => (
+                        <option key={asset.id} value={asset.id} disabled={asset.id === derivedAssetId}>
+                          {asset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {relationCreateError && <p className="mt-3 text-sm text-red-700">{relationCreateError}</p>}
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      type="submit"
+                      disabled={
+                        creatingRelation ||
+                        !derivedAssetId ||
+                        !sourceAssetId ||
+                        derivedAssetId === sourceAssetId
+                      }
+                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                    >
+                      {creatingRelation ? 'Creating...' : 'Create Relation'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={creatingRelation}
+                      onClick={() => {
+                        setIsAddingRelation(false)
+                        setDerivedAssetId('')
+                        setSourceAssetId('')
+                        setRelationCreateError(null)
+                      }}
+                      className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="mt-4">
+                {relationsLoading && <p className="text-neutral-600">Loading relations...</p>}
+                {relationsError && <p className="text-red-700">{relationsError}</p>}
+                {!relationsLoading && !relationsError && relations.length === 0 && (
+                  <p className="text-neutral-600">No relations yet.</p>
+                )}
+                {!relationsLoading && !relationsError && relations.length > 0 && (
+                  <ul className="space-y-3">
+                    {relations.map((relation) => (
+                      <li key={relation.id} className="rounded-md border border-neutral-200 px-4 py-3">
+                        <p className="font-medium">
+                          {assetNamesById.get(relation.from_asset_id) ?? 'Unknown asset'}
+                        </p>
+                        <p className="mt-1 text-sm text-neutral-600">derived from</p>
+                        <p className="font-medium">{assetNamesById.get(relation.to_asset_id) ?? 'Unknown asset'}</p>
+                        <p className="mt-1 text-sm text-neutral-600">
+                          Created {new Date(relation.created_at).toLocaleString()}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </section>
