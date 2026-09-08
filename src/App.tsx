@@ -4,6 +4,7 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import ProjectListPage from './pages/ProjectListPage'
 import ProjectWorkspacePage from './pages/ProjectWorkspacePage'
+import PublicPassportPage from './pages/PublicPassportPage'
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/projects" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/p/:publicId" element={<PublicPassportPage />} />
           <Route
             path="/projects"
             element={

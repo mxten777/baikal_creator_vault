@@ -50,6 +50,9 @@ type PassportData = {
 type Passport = {
   id: string
   asset_id: string
+  public_id: string
+  is_public: boolean
+  published_at: string | null
   data: PassportData
   updated_at: string
 }
@@ -364,7 +367,7 @@ export default function ProjectWorkspacePage() {
 
     const { data, error } = await supabase
       .from('passports')
-      .select('id, asset_id, data, updated_at')
+      .select('id, asset_id, public_id, is_public, published_at, data, updated_at')
       .in(
         'asset_id',
         currentAssets.map((asset) => asset.id),
@@ -626,6 +629,22 @@ export default function ProjectWorkspacePage() {
     setSavingPassport(false)
   }
 
+  async function handleSetPassportVisibility(passport: Passport, isPublic: boolean) {
+    const { error } = await supabase
+      .from('passports')
+      .update({ is_public: isPublic, published_at: isPublic ? new Date().toISOString() : null })
+      .eq('asset_id', passport.asset_id)
+    if (error) {
+      setPassportsError(error.message)
+      return
+    }
+    await loadPassports(assets)
+  }
+
+  async function handleCopyPublicLink(publicId: string) {
+    await navigator.clipboard.writeText(`${window.location.origin}/p/${publicId}`)
+  }
+
   const assetNamesById = new Map(assets.map((asset) => [asset.id, asset.name]))
   const passportsByAssetId = new Map(passports.map((passport) => [passport.asset_id, passport]))
 
@@ -797,6 +816,21 @@ export default function ProjectWorkspacePage() {
                               <p className="mt-1 text-neutral-600">
                                 License: {passportsByAssetId.get(asset.id)?.data.license || 'Not specified'}
                               </p>
+                              {passportsByAssetId.get(asset.id) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                                  <span className={passportsByAssetId.get(asset.id)!.is_public ? 'text-green-700' : 'text-neutral-500'}>
+                                    {passportsByAssetId.get(asset.id)!.is_public ? 'Public' : 'Private'}
+                                  </span>
+                                  <button type="button" className="underline" onClick={() => void handleSetPassportVisibility(passportsByAssetId.get(asset.id)!, !passportsByAssetId.get(asset.id)!.is_public)}>
+                                    {passportsByAssetId.get(asset.id)!.is_public ? 'Unpublish' : 'Publish'}
+                                  </button>
+                                  {passportsByAssetId.get(asset.id)!.is_public && (
+                                    <button type="button" className="underline" onClick={() => void handleCopyPublicLink(passportsByAssetId.get(asset.id)!.public_id)}>
+                                      Copy Public Link
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                               {(() => {
                                 const { sources, derivatives } = getProvenanceSummary(asset.id, relations, assetNamesById)
                                 if (sources.length === 0 && derivatives.length === 0) {
