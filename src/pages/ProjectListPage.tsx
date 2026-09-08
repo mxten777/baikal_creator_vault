@@ -1,11 +1,81 @@
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/useAuth'
 
+type Project = {
+  id: string
+  name: string
+  created_at: string
+}
+
 export default function ProjectListPage() {
   const { user } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadProjects() {
+      setLoading(true)
+      setFetchError(null)
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, created_at')
+        .order('created_at', { ascending: false })
+
+      if (!active) return
+
+      if (error) {
+        setFetchError(error.message)
+      } else {
+        setProjects(data)
+      }
+
+      setLoading(false)
+    }
+
+    void loadProjects()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
+  }
+
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const trimmedName = name.trim()
+    if (!trimmedName || !user || creating) return
+
+    setCreating(true)
+    setCreateError(null)
+
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({ name: trimmedName, owner_id: user.id })
+      .select('id, name, created_at')
+      .single()
+
+    if (error) {
+      setCreateError(error.message)
+    } else {
+      setProjects((currentProjects) => [data, ...currentProjects])
+      setName('')
+      setIsCreating(false)
+    }
+
+    setCreating(false)
   }
 
   return (
@@ -27,17 +97,77 @@ export default function ProjectListPage() {
 
         <div className="mt-12 flex items-center justify-between">
           <h2 className="text-xl font-medium">Projects</h2>
-          {/* Placeholder only — project creation is implemented in STEP 8-D. */}
           <button
             type="button"
-            disabled
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-500"
+            onClick={() => {
+              setIsCreating(true)
+              setCreateError(null)
+            }}
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
           >
             + New Project
           </button>
         </div>
 
-        <p className="mt-8 text-neutral-600">No projects yet.</p>
+        {isCreating && (
+          <form onSubmit={handleCreate} className="mt-8 flex max-w-md items-start gap-3">
+            <div className="flex-1">
+              <label htmlFor="project-name" className="sr-only">
+                Project name
+              </label>
+              <input
+                id="project-name"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={200}
+                autoFocus
+                placeholder="Project name"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+              {createError && <p className="mt-2 text-sm text-red-700">{createError}</p>}
+            </div>
+            <button
+              type="submit"
+              disabled={creating || !name.trim()}
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+            >
+              {creating ? 'Creating...' : 'Create'}
+            </button>
+            <button
+              type="button"
+              disabled={creating}
+              onClick={() => {
+                setIsCreating(false)
+                setName('')
+                setCreateError(null)
+              }}
+              className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        <div className="mt-8">
+          {loading && <p className="text-neutral-600">Loading projects...</p>}
+          {fetchError && <p className="text-red-700">{fetchError}</p>}
+          {!loading && !fetchError && projects.length === 0 && (
+            <p className="text-neutral-600">No projects yet.</p>
+          )}
+          {!loading && !fetchError && projects.length > 0 && (
+            <ul className="space-y-3">
+              {projects.map((project) => (
+                <li key={project.id} className="rounded-md border border-neutral-200 px-4 py-3">
+                  <p className="font-medium">{project.name}</p>
+                  <p className="mt-1 text-sm text-neutral-600">
+                    Created {new Date(project.created_at).toLocaleDateString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </main>
   )
