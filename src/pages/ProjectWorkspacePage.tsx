@@ -44,6 +44,170 @@ type AssetRelation = {
 
 const DERIVED_FROM_RELATION_TYPE = 'derived_from'
 
+type GraphNode = Asset & {
+  level: number
+  row: number
+}
+
+type GraphEdge = {
+  id: string
+  sourceAssetId: string
+  derivedAssetId: string
+}
+
+function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRelation[] }) {
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]))
+  const graphEdges: GraphEdge[] = relations
+    .filter(
+      (relation) =>
+        relation.relation_type === DERIVED_FROM_RELATION_TYPE &&
+        assetsById.has(relation.from_asset_id) &&
+        assetsById.has(relation.to_asset_id),
+    )
+    .map((relation) => ({
+      id: relation.id,
+      // DB: from_asset_id is the derived asset and to_asset_id is its source.
+      sourceAssetId: relation.to_asset_id,
+      derivedAssetId: relation.from_asset_id,
+    }))
+
+  if (assets.length === 0) {
+    return <p className="mt-4 text-neutral-600">No assets yet.</p>
+  }
+
+  if (graphEdges.length === 0) {
+    return <p className="mt-4 text-neutral-600">No relations yet. Create a relation to build the provenance graph.</p>
+  }
+
+  const childrenBySource = new Map<string, string[]>()
+  const incomingEdgeCount = new Map(assets.map((asset) => [asset.id, 0]))
+  for (const edge of graphEdges) {
+    childrenBySource.set(edge.sourceAssetId, [...(childrenBySource.get(edge.sourceAssetId) ?? []), edge.derivedAssetId])
+    incomingEdgeCount.set(edge.derivedAssetId, (incomingEdgeCount.get(edge.derivedAssetId) ?? 0) + 1)
+  }
+
+  const levelsByAssetId = new Map<string, number>()
+  const queue = assets.filter((asset) => incomingEdgeCount.get(asset.id) === 0)
+  let queueIndex = 0
+
+  // Kahn traversal terminates even when malformed data contains a provenance cycle.
+  while (queueIndex < queue.length) {
+    const asset = queue[queueIndex]
+    queueIndex += 1
+    const level = levelsByAssetId.get(asset.id) ?? 0
+    levelsByAssetId.set(asset.id, level)
+
+    for (const childId of childrenBySource.get(asset.id) ?? []) {
+      levelsByAssetId.set(childId, Math.max(levelsByAssetId.get(childId) ?? 0, level + 1))
+      const remainingIncomingEdges = (incomingEdgeCount.get(childId) ?? 1) - 1
+      incomingEdgeCount.set(childId, remainingIncomingEdges)
+      if (remainingIncomingEdges === 0) {
+        queue.push(assetsById.get(childId)!)
+      }
+    }
+  }
+
+  const cycleDetected = levelsByAssetId.size < assets.length
+  const cycleLevel = Math.max(0, ...levelsByAssetId.values()) + 1
+  for (const asset of assets) {
+    if (!levelsByAssetId.has(asset.id)) levelsByAssetId.set(asset.id, cycleLevel)
+  }
+
+  const nodesByLevel = new Map<number, Asset[]>()
+  for (const asset of assets) {
+    const level = levelsByAssetId.get(asset.id) ?? 0
+    nodesByLevel.set(level, [...(nodesByLevel.get(level) ?? []), asset])
+  }
+
+  const graphNodes: GraphNode[] = []
+  for (const [level, levelAssets] of nodesByLevel) {
+    levelAssets.forEach((asset, row) => graphNodes.push({ ...asset, level, row }))
+  }
+
+  const nodeWidth = 180
+  const nodeHeight = 68
+  const horizontalGap = 44
+  const verticalGap = 78
+  const widestLevel = Math.max(...Array.from(nodesByLevel.values(), (levelAssets) => levelAssets.length))
+  const graphWidth = Math.max(640, widestLevel * nodeWidth + (widestLevel - 1) * horizontalGap + 64)
+  const graphHeight = Math.max(260, (nodesByLevel.size - 1) * (nodeHeight + verticalGap) + nodeHeight + 64)
+  const nodePosition = (node: GraphNode) => {
+    const nodesInLevel = nodesByLevel.get(node.level) ?? []
+    const levelWidth = nodesInLevel.length * nodeWidth + (nodesInLevel.length - 1) * horizontalGap
+    return {
+      left: (graphWidth - levelWidth) / 2 + node.row * (nodeWidth + horizontalGap),
+      top: 32 + node.level * (nodeHeight + verticalGap),
+    }
+  }
+  const graphNodesById = new Map(graphNodes.map((node) => [node.id, node]))
+  const connectedAssetIds = new Set(graphEdges.flatMap((edge) => [edge.sourceAssetId, edge.derivedAssetId]))
+  const unconnectedAssets = assets.filter((asset) => !connectedAssetIds.has(asset.id))
+
+  return (
+    <>
+      {cycleDetected && <p className="mt-4 text-sm text-amber-700">A provenance cycle was detected and is shown below.</p>}
+      <div className="mt-4 overflow-x-auto rounded-md border border-neutral-200 bg-white">
+        <div className="relative" style={{ width: graphWidth, height: graphHeight }}>
+          <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
+            <defs>
+              <marker id="asset-graph-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
+              </marker>
+            </defs>
+            {graphEdges.map((edge) => {
+              const sourceNode = graphNodesById.get(edge.sourceAssetId)
+              const derivedNode = graphNodesById.get(edge.derivedAssetId)
+              if (!sourceNode || !derivedNode) return null
+              const sourcePosition = nodePosition(sourceNode)
+              const derivedPosition = nodePosition(derivedNode)
+              const startX = sourcePosition.left + nodeWidth / 2
+              const startY = sourcePosition.top + nodeHeight
+              const endX = derivedPosition.left + nodeWidth / 2
+              const endY = derivedPosition.top - 8
+              const labelX = (startX + endX) / 2
+              const labelY = (startY + endY) / 2
+              return (
+                <g key={edge.id} className="text-neutral-400">
+                  <line x1={startX} y1={startY} x2={endX} y2={endY} stroke="currentColor" markerEnd="url(#asset-graph-arrow)" />
+                  <text x={labelX} y={labelY - 4} textAnchor="middle" className="fill-neutral-500 text-[11px]">
+                    derived from
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+          {graphNodes.map((node) => {
+            const position = nodePosition(node)
+            return (
+              <div
+                key={node.id}
+                className="absolute rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 shadow-sm"
+                style={{ width: nodeWidth, height: nodeHeight, left: position.left, top: position.top }}
+              >
+                <p className="truncate text-sm font-medium" title={node.name}>{node.name}</p>
+                <p className="mt-1 truncate text-xs text-neutral-600" title={node.asset_type}>{node.asset_type}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {unconnectedAssets.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-neutral-700">Unconnected Assets</h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {unconnectedAssets.map((asset) => (
+              <li key={asset.id} className="rounded-md border border-neutral-200 px-3 py-2 text-sm">
+                <span className="font-medium">{asset.name}</span>
+                <span className="text-neutral-600"> - {asset.asset_type}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams()
   const { user } = useAuth()
@@ -524,6 +688,13 @@ export default function ProjectWorkspacePage() {
                   </ol>
                 )}
               </div>
+            </section>
+
+            <section className="mt-12">
+              <h2 className="text-xl font-medium">Graph</h2>
+              {!assetsLoading && !assetsError && !relationsLoading && !relationsError && (
+                <AssetGraph assets={assets} relations={relations} />
+              )}
             </section>
 
             <section className="mt-12">
