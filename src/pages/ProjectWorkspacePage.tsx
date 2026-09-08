@@ -42,6 +42,18 @@ type AssetRelation = {
   created_at: string
 }
 
+type PassportData = {
+  statement: string | null
+  license: string | null
+}
+
+type Passport = {
+  id: string
+  asset_id: string
+  data: PassportData
+  updated_at: string
+}
+
 const DERIVED_FROM_RELATION_TYPE = 'derived_from'
 
 type GraphNode = Asset & {
@@ -208,6 +220,17 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
   )
 }
 
+// Provenance is derived on the fly from asset_relations; never copied into passport data.
+function getProvenanceSummary(assetId: string, relations: AssetRelation[], assetNamesById: Map<string, string>) {
+  const sources = relations
+    .filter((relation) => relation.relation_type === DERIVED_FROM_RELATION_TYPE && relation.from_asset_id === assetId)
+    .map((relation) => assetNamesById.get(relation.to_asset_id) ?? 'Unknown asset')
+  const derivatives = relations
+    .filter((relation) => relation.relation_type === DERIVED_FROM_RELATION_TYPE && relation.to_asset_id === assetId)
+    .map((relation) => assetNamesById.get(relation.from_asset_id) ?? 'Unknown asset')
+  return { sources, derivatives }
+}
+
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams()
   const { user } = useAuth()
@@ -236,6 +259,14 @@ export default function ProjectWorkspacePage() {
   const [sourceAssetId, setSourceAssetId] = useState('')
   const [creatingRelation, setCreatingRelation] = useState(false)
   const [relationCreateError, setRelationCreateError] = useState<string | null>(null)
+  const [passports, setPassports] = useState<Passport[]>([])
+  const [passportsLoading, setPassportsLoading] = useState(true)
+  const [passportsError, setPassportsError] = useState<string | null>(null)
+  const [editingPassportAssetId, setEditingPassportAssetId] = useState<string | null>(null)
+  const [passportStatement, setPassportStatement] = useState('')
+  const [passportLicense, setPassportLicense] = useState('')
+  const [savingPassport, setSavingPassport] = useState(false)
+  const [passportSaveError, setPassportSaveError] = useState<string | null>(null)
 
   const loadAssets = useCallback(async (active = true) => {
     if (!projectId) return []
@@ -319,6 +350,37 @@ export default function ProjectWorkspacePage() {
     return data
   }, [projectId])
 
+  const loadPassports = useCallback(async (currentAssets: Asset[], active = true) => {
+    setPassportsLoading(true)
+    setPassportsError(null)
+
+    if (currentAssets.length === 0) {
+      if (active) {
+        setPassports([])
+        setPassportsLoading(false)
+      }
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('passports')
+      .select('id, asset_id, data, updated_at')
+      .in(
+        'asset_id',
+        currentAssets.map((asset) => asset.id),
+      )
+
+    if (!active) return
+
+    if (error) {
+      setPassportsError(error.message)
+    } else {
+      setPassports(data)
+    }
+
+    setPassportsLoading(false)
+  }, [])
+
   useEffect(() => {
     let active = true
 
@@ -329,6 +391,7 @@ export default function ProjectWorkspacePage() {
         setAssetsLoading(false)
         setTimelineLoading(false)
         setRelationsLoading(false)
+        setPassportsLoading(false)
         return
       }
 
@@ -349,6 +412,7 @@ export default function ProjectWorkspacePage() {
         setAssetsLoading(false)
         setTimelineLoading(false)
         setRelationsLoading(false)
+        setPassportsLoading(false)
         return
       }
 
@@ -358,6 +422,7 @@ export default function ProjectWorkspacePage() {
         setAssetsLoading(false)
         setTimelineLoading(false)
         setRelationsLoading(false)
+        setPassportsLoading(false)
         return
       }
 
@@ -367,6 +432,7 @@ export default function ProjectWorkspacePage() {
       const currentAssets = await loadAssets(active)
       await loadTimeline(currentAssets, active)
       await loadRelations(active)
+      await loadPassports(currentAssets, active)
     }
 
     void loadWorkspace()
@@ -374,11 +440,12 @@ export default function ProjectWorkspacePage() {
     return () => {
       active = false
     }
-  }, [loadAssets, loadTimeline, loadRelations, projectId])
+  }, [loadAssets, loadTimeline, loadRelations, loadPassports, projectId])
 
   async function refreshAssetsAndTimeline() {
     const currentAssets = await loadAssets()
     await loadTimeline(currentAssets)
+    await loadPassports(currentAssets)
   }
 
   async function handleCreateAsset(event: React.FormEvent<HTMLFormElement>) {
@@ -518,7 +585,50 @@ export default function ProjectWorkspacePage() {
     setCreatingRelation(false)
   }
 
+  function handleOpenPassportEditor(passport: Passport) {
+    setEditingPassportAssetId(passport.asset_id)
+    setPassportStatement(passport.data.statement ?? '')
+    setPassportLicense(passport.data.license ?? '')
+    setPassportSaveError(null)
+  }
+
+  async function handleSavePassport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!editingPassportAssetId || savingPassport) return
+
+    setSavingPassport(true)
+    setPassportSaveError(null)
+
+    const trimmedStatement = passportStatement.trim()
+    const trimmedLicense = passportLicense.trim()
+
+    // Passport row is guaranteed by the assets_create_passport_trigger; UPDATE only, never upsert.
+    const { error } = await supabase
+      .from('passports')
+      .update({
+        data: {
+          statement: trimmedStatement === '' ? null : trimmedStatement,
+          license: trimmedLicense === '' ? null : trimmedLicense,
+        },
+      })
+      .eq('asset_id', editingPassportAssetId)
+
+    if (error) {
+      setPassportSaveError(error.message)
+      setSavingPassport(false)
+      return
+    }
+
+    await loadPassports(assets)
+
+    setEditingPassportAssetId(null)
+    setSavingPassport(false)
+  }
+
   const assetNamesById = new Map(assets.map((asset) => [asset.id, asset.name]))
+  const passportsByAssetId = new Map(passports.map((passport) => [passport.asset_id, passport]))
+
 
   return (
     <main className="min-h-full bg-neutral-50 text-neutral-900">
@@ -657,6 +767,101 @@ export default function ProjectWorkspacePage() {
                             >
                               {downloadPendingId === asset.id ? 'Opening...' : 'Download'}
                             </button>
+                          )}
+                        </div>
+
+                        <div className="mt-3 border-t border-neutral-200 pt-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <h3 className="text-sm font-medium text-neutral-700">Passport</h3>
+                            {editingPassportAssetId !== asset.id && (
+                              <button
+                                type="button"
+                                disabled={!passportsByAssetId.has(asset.id)}
+                                onClick={() => {
+                                  const passport = passportsByAssetId.get(asset.id)
+                                  if (passport) handleOpenPassportEditor(passport)
+                                }}
+                                className="text-sm text-neutral-700 underline-offset-4 hover:underline disabled:text-neutral-400"
+                              >
+                                Edit Passport
+                              </button>
+                            )}
+                          </div>
+
+                          {passportsLoading && <p className="mt-2 text-sm text-neutral-600">Loading passport...</p>}
+                          {passportsError && <p className="mt-2 text-sm text-red-700">{passportsError}</p>}
+
+                          {!passportsLoading && !passportsError && editingPassportAssetId !== asset.id && (
+                            <div className="mt-2 text-sm text-neutral-700">
+                              <p>{passportsByAssetId.get(asset.id)?.data.statement || 'No statement yet'}</p>
+                              <p className="mt-1 text-neutral-600">
+                                License: {passportsByAssetId.get(asset.id)?.data.license || 'Not specified'}
+                              </p>
+                              {(() => {
+                                const { sources, derivatives } = getProvenanceSummary(asset.id, relations, assetNamesById)
+                                if (sources.length === 0 && derivatives.length === 0) {
+                                  return <p className="mt-1 text-neutral-600">No provenance recorded yet.</p>
+                                }
+                                return (
+                                  <p className="mt-1 text-neutral-600">
+                                    {sources.length > 0 && `Derived from: ${sources.join(', ')}`}
+                                    {sources.length > 0 && derivatives.length > 0 && ' · '}
+                                    {derivatives.length > 0 && `Source for: ${derivatives.join(', ')}`}
+                                  </p>
+                                )
+                              })()}
+                            </div>
+                          )}
+
+                          {editingPassportAssetId === asset.id && (
+                            <form onSubmit={handleSavePassport} className="mt-2 space-y-3">
+                              <div>
+                                <label htmlFor={`passport-statement-${asset.id}`} className="text-sm font-medium text-neutral-700">
+                                  Statement
+                                </label>
+                                <textarea
+                                  id={`passport-statement-${asset.id}`}
+                                  value={passportStatement}
+                                  onChange={(event) => setPassportStatement(event.target.value)}
+                                  rows={3}
+                                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor={`passport-license-${asset.id}`} className="text-sm font-medium text-neutral-700">
+                                  License
+                                </label>
+                                <input
+                                  id={`passport-license-${asset.id}`}
+                                  type="text"
+                                  value={passportLicense}
+                                  onChange={(event) => setPassportLicense(event.target.value)}
+                                  placeholder="e.g. All Rights Reserved"
+                                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                                />
+                              </div>
+                              {passportSaveError && <p className="text-sm text-red-700">{passportSaveError}</p>}
+                              <div className="flex gap-3">
+                                <button
+                                  type="submit"
+                                  disabled={savingPassport}
+                                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                                >
+                                  {savingPassport ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={savingPassport}
+                                  onClick={() => {
+                                    setEditingPassportAssetId(null)
+                                    setPassportSaveError(null)
+                                  }}
+                                  className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
                           )}
                         </div>
                       </li>
