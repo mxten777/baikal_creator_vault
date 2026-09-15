@@ -5,7 +5,7 @@ import { useAuth } from '../auth/useAuth'
 
 const ASSET_CREATED_EVENT_TYPE = 'asset_created'
 const ASSET_BUCKET = 'creator-assets'
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const SIGNED_URL_TTL_SECONDS = 60
 
 function sanitizeFilename(name: string): string {
@@ -707,7 +707,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="asset-file" className="text-sm font-medium text-neutral-700">
-                      File (max 50MB)
+                      File (max 100MB)
                     </label>
                     <input
                       id="asset-file"
@@ -716,7 +716,7 @@ export default function ProjectWorkspacePage() {
                       className="mt-1 w-full text-sm text-neutral-700"
                     />
                     {assetFile && assetFile.size > MAX_FILE_SIZE_BYTES && (
-                      <p className="mt-1 text-sm text-red-700">File is larger than 50MB.</p>
+                      <p className="mt-1 text-sm text-red-700">File is larger than 100MB.</p>
                     )}
                   </div>
                 </div>
