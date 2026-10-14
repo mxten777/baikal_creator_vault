@@ -541,18 +541,30 @@ export default function ProjectWorkspacePage() {
     setDownloadPendingId(asset.id)
     setDownloadError(null)
 
-    const { data, error } = await supabase.storage
-      .from(ASSET_BUCKET)
-      .createSignedUrl(asset.storage_path, SIGNED_URL_TTL_SECONDS)
+    try {
+      const filename = asset.storage_path.split('/').pop() ?? ''
+      const { data, error } = await supabase.storage
+        .from(ASSET_BUCKET)
+        .createSignedUrl(asset.storage_path, SIGNED_URL_TTL_SECONDS, { download: filename })
 
-    if (error) {
-      setDownloadError(`Could not open "${asset.name}": ${error.message}`)
+      if (error) {
+        setDownloadError(`Could not download "${asset.name}": ${error.message}`)
+        return
+      }
+
+      const link = document.createElement('a')
+      link.href = data.signedUrl
+      link.download = filename
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.'
+      setDownloadError(`Could not download "${asset.name}": ${message}`)
+    } finally {
       setDownloadPendingId(null)
-      return
     }
-
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
-    setDownloadPendingId(null)
   }
 
   async function handleCreateRelation(event: React.FormEvent<HTMLFormElement>) {
