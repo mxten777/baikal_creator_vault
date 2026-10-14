@@ -270,6 +270,11 @@ export default function ProjectWorkspacePage() {
   const [passportLicense, setPassportLicense] = useState('')
   const [savingPassport, setSavingPassport] = useState(false)
   const [passportSaveError, setPassportSaveError] = useState<string | null>(null)
+  const [publicLinkCopy, setPublicLinkCopy] = useState<{
+    publicId: string
+    url: string
+    copied: boolean
+  } | null>(null)
 
   const loadAssets = useCallback(async (active = true) => {
     if (!projectId) return []
@@ -642,7 +647,14 @@ export default function ProjectWorkspacePage() {
   }
 
   async function handleCopyPublicLink(publicId: string) {
-    await navigator.clipboard.writeText(`${window.location.origin}/p/${publicId}`)
+    const url = `${window.location.origin}/p/${publicId}`
+    setPublicLinkCopy(null)
+    try {
+      await navigator.clipboard.writeText(url)
+      setPublicLinkCopy({ publicId, url, copied: true })
+    } catch {
+      setPublicLinkCopy({ publicId, url, copied: false })
+    }
   }
 
   const assetNamesById = new Map(assets.map((asset) => [asset.id, asset.name]))
@@ -831,6 +843,38 @@ export default function ProjectWorkspacePage() {
                                   )}
                                 </div>
                               )}
+                              {passportsByAssetId.get(asset.id)?.is_public && publicLinkCopy &&
+                                publicLinkCopy.publicId === passportsByAssetId.get(asset.id)?.public_id && (
+                                  publicLinkCopy.copied ? (
+                                    <p role="status" className="mt-2 text-xs text-green-700">
+                                      링크가 복사되었습니다
+                                    </p>
+                                  ) : (
+                                    <div className="mt-2 space-y-2 text-xs">
+                                      <p role="alert" className="text-red-700">
+                                        링크를 복사하지 못했습니다. 아래 URL을 선택하여 직접 복사하거나 열어 주세요.
+                                      </p>
+                                      <label className="block">
+                                        <span className="text-neutral-600">공개 URL</span>
+                                        <input
+                                          type="text"
+                                          readOnly
+                                          value={publicLinkCopy.url}
+                                          onFocus={(event) => event.currentTarget.select()}
+                                          className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                                        />
+                                      </label>
+                                      <a
+                                        href={publicLinkCopy.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-neutral-600 underline"
+                                      >
+                                        공개 링크 열기
+                                      </a>
+                                    </div>
+                                  )
+                                )}
                               {(() => {
                                 const { sources, derivatives } = getProvenanceSummary(asset.id, relations, assetNamesById)
                                 if (sources.length === 0 && derivatives.length === 0) {
