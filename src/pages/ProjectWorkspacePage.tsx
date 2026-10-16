@@ -7,6 +7,8 @@ const ASSET_CREATED_EVENT_TYPE = 'asset_created'
 const ASSET_BUCKET = 'creator-assets'
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const SIGNED_URL_TTL_SECONDS = 60
+const PASSPORT_PUBLIC_NOTICE = '공개 링크를 아는 사람은 로그인 없이 저장된 Statement·License와 Asset 이름·유형·등록 시각을 볼 수 있습니다. 원본 관계(derived_from)는 최대 1개가 제공되며, 원본 Passport가 공개 상태이면 원본 Asset 이름과 공개 식별자가, 비공개이면 비공개 표시만 제공됩니다. 프로젝트 이름과 Timeline은 공개되지 않습니다.'
+const PASSPORT_FILE_NOTICE = '원본 파일은 비공개로 유지되며 Passport 공개 링크로 열거나 다운로드할 수 없습니다. 소유자가 Download로 발급한 별도 다운로드 링크는 60초간 유효하므로 공유에 주의해 주세요.'
 
 function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'file'
@@ -270,6 +272,7 @@ export default function ProjectWorkspacePage() {
   const [passportLicense, setPassportLicense] = useState('')
   const [savingPassport, setSavingPassport] = useState(false)
   const [passportSaveError, setPassportSaveError] = useState<string | null>(null)
+  const [savedPassportAssetId, setSavedPassportAssetId] = useState<string | null>(null)
   const [publicLinkCopy, setPublicLinkCopy] = useState<{
     publicId: string
     url: string
@@ -610,6 +613,7 @@ export default function ProjectWorkspacePage() {
     setPassportStatement(passport.data.statement ?? '')
     setPassportLicense(passport.data.license ?? '')
     setPassportSaveError(null)
+    setSavedPassportAssetId(null)
   }
 
   async function handleSavePassport(event: React.FormEvent<HTMLFormElement>) {
@@ -619,6 +623,7 @@ export default function ProjectWorkspacePage() {
 
     setSavingPassport(true)
     setPassportSaveError(null)
+    setSavedPassportAssetId(null)
 
     const trimmedStatement = passportStatement.trim()
     const trimmedLicense = passportLicense.trim()
@@ -642,11 +647,16 @@ export default function ProjectWorkspacePage() {
 
     await loadPassports(assets)
 
+    setSavedPassportAssetId(editingPassportAssetId)
     setEditingPassportAssetId(null)
     setSavingPassport(false)
   }
 
   async function handleSetPassportVisibility(passport: Passport, isPublic: boolean) {
+    if (isPublic && !window.confirm(
+      `${PASSPORT_PUBLIC_NOTICE}\n\n${PASSPORT_FILE_NOTICE}\n\nStatement·License에 개인정보나 공개하면 안 되는 내용이 없는지 확인해 주세요. 저장된 내용으로 Passport를 공개하시겠습니까?`,
+    )) return
+
     const { error } = await supabase
       .from('passports')
       .update({ is_public: isPublic, published_at: isPublic ? new Date().toISOString() : null })
@@ -831,8 +841,15 @@ export default function ProjectWorkspacePage() {
                             )}
                           </div>
 
+                          <div className="mt-2 space-y-1 text-xs text-neutral-600">
+                            <p>{PASSPORT_PUBLIC_NOTICE}</p>
+                            <p>{PASSPORT_FILE_NOTICE}</p>
+                          </div>
                           {passportsLoading && <p className="mt-2 text-sm text-neutral-600">Loading passport...</p>}
                           {passportsError && <p className="mt-2 text-sm text-red-700">{passportsError}</p>}
+                          {!passportsLoading && !passportsError && savedPassportAssetId === asset.id && (
+                            <p role="status" className="mt-2 text-sm text-green-700">Passport가 저장되었습니다.</p>
+                          )}
 
                           {!passportsLoading && !passportsError && editingPassportAssetId !== asset.id && (
                             <div className="mt-2 text-sm text-neutral-700">
@@ -911,11 +928,15 @@ export default function ProjectWorkspacePage() {
                                 </label>
                                 <textarea
                                   id={`passport-statement-${asset.id}`}
+                                  aria-describedby={`passport-statement-help-${asset.id}`}
                                   value={passportStatement}
                                   onChange={(event) => setPassportStatement(event.target.value)}
                                   rows={3}
                                   className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                                 />
+                                <p id={`passport-statement-help-${asset.id}`} className="mt-1 text-xs text-neutral-600">
+                                  작품의 창작 의도와 제작 과정을 적어 주세요. 예: "직접 녹음한 빗소리에 피아노 연주를 더해, 조용한 새벽의 분위기를 표현한 곡입니다."
+                                </p>
                               </div>
                               <div>
                                 <label htmlFor={`passport-license-${asset.id}`} className="text-sm font-medium text-neutral-700">
@@ -923,13 +944,20 @@ export default function ProjectWorkspacePage() {
                                 </label>
                                 <input
                                   id={`passport-license-${asset.id}`}
+                                  aria-describedby={`passport-license-help-${asset.id}`}
                                   type="text"
                                   value={passportLicense}
                                   onChange={(event) => setPassportLicense(event.target.value)}
-                                  placeholder="e.g. All Rights Reserved"
+                                  placeholder="예: 모든 권리 보유. 사용 전 창작자에게 문의해 주세요."
                                   className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                                 />
+                                <p id={`passport-license-help-${asset.id}`} className="mt-1 text-xs text-neutral-600">
+                                  다른 사람이 작품을 사용할 수 있는 조건을 적어 주세요. 예: "개인 감상만 허용하며, 재배포·상업적 이용은 사전 허락이 필요합니다." 본인이 권한을 가진 범위에서 실제 허용할 조건으로 작성해 주세요.
+                                </p>
                               </div>
+                              <p className="text-xs text-neutral-600">
+                                저장만으로 비공개 Passport가 공개되지는 않습니다. 이미 공개 중인 Passport는 저장한 내용이 공개 링크에 바로 반영됩니다.
+                              </p>
                               {passportSaveError && <p className="text-sm text-red-700">{passportSaveError}</p>}
                               <div className="flex gap-3">
                                 <button
