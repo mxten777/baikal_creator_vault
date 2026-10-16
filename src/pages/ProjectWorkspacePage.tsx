@@ -208,6 +208,7 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
           })}
         </div>
       </div>
+      <p className="mt-2 text-xs text-neutral-600 sm:hidden">관계도를 좌우로 스크롤해 전체를 확인하세요.</p>
       {unconnectedAssets.length > 0 && (
         <div className="mt-4">
           <h3 className="text-sm font-medium text-neutral-700">연결되지 않은 에셋</h3>
@@ -703,7 +704,7 @@ export default function ProjectWorkspacePage() {
                   setIsAddingAsset(true)
                   setCreateError(null)
                 }}
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
+                className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 max-sm:min-h-11 max-sm:min-w-11"
               >
                 에셋 추가
               </button>
@@ -747,7 +748,7 @@ export default function ProjectWorkspacePage() {
                       id="asset-file"
                       type="file"
                       onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
-                      className="mt-1 w-full text-sm text-neutral-700"
+                      className="mt-1 w-full text-sm text-neutral-700 max-sm:min-h-11 max-sm:file:min-h-11"
                     />
                     {assetFile && assetFile.size > MAX_FILE_SIZE_BYTES && (
                       <p className="mt-1 text-sm text-red-700">파일 크기가 100MB를 초과합니다.</p>
@@ -765,7 +766,7 @@ export default function ProjectWorkspacePage() {
                       !assetFile ||
                       assetFile.size > MAX_FILE_SIZE_BYTES
                     }
-                    className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                    className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                   >
                     {creatingAsset ? '업로드 중…' : '에셋 등록'}
                   </button>
@@ -779,7 +780,7 @@ export default function ProjectWorkspacePage() {
                       setAssetFile(null)
                       setCreateError(null)
                     }}
-                    className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                    className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                   >
                     취소
                   </button>
@@ -816,7 +817,7 @@ export default function ProjectWorkspacePage() {
                               type="button"
                               disabled={downloadPendingId !== null}
                               onClick={() => void handleOpenAssetFile(asset)}
-                              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                             >
                               {downloadPendingId === asset.id ? '여는 중…' : '다운로드'}
                             </button>
@@ -834,7 +835,7 @@ export default function ProjectWorkspacePage() {
                                   const passport = passportsByAssetId.get(asset.id)
                                   if (passport) handleOpenPassportEditor(passport)
                                 }}
-                                className="text-sm text-neutral-700 underline-offset-4 hover:underline disabled:text-neutral-400"
+                                className="text-sm text-neutral-700 underline-offset-4 hover:underline disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                               >
                                 패스포트 편집
                               </button>
@@ -862,11 +863,11 @@ export default function ProjectWorkspacePage() {
                                   <span className={passportsByAssetId.get(asset.id)!.is_public ? 'text-green-700' : 'text-neutral-500'}>
                                     {passportsByAssetId.get(asset.id)!.is_public ? '공개' : '비공개'}
                                   </span>
-                                  <button type="button" className="underline" onClick={() => void handleSetPassportVisibility(passportsByAssetId.get(asset.id)!, !passportsByAssetId.get(asset.id)!.is_public)}>
+                                  <button type="button" className="underline max-sm:min-h-11 max-sm:min-w-11" onClick={() => void handleSetPassportVisibility(passportsByAssetId.get(asset.id)!, !passportsByAssetId.get(asset.id)!.is_public)}>
                                     {passportsByAssetId.get(asset.id)!.is_public ? '비공개로 전환' : '공개하기'}
                                   </button>
                                   {passportsByAssetId.get(asset.id)!.is_public && (
-                                    <button type="button" className="underline" onClick={() => void handleCopyPublicLink(passportsByAssetId.get(asset.id)!.public_id)}>
+                                    <button type="button" className="underline max-sm:min-h-11 max-sm:min-w-11" onClick={() => void handleCopyPublicLink(passportsByAssetId.get(asset.id)!.public_id)}>
                                       공개 링크 복사
                                     </button>
                                   )}
@@ -963,7 +964,7 @@ export default function ProjectWorkspacePage() {
                                 <button
                                   type="submit"
                                   disabled={savingPassport}
-                                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                                 >
                                   {savingPassport ? '저장 중…' : '저장'}
                                 </button>
@@ -974,7 +975,7 @@ export default function ProjectWorkspacePage() {
                                     setEditingPassportAssetId(null)
                                     setPassportSaveError(null)
                                   }}
-                                  className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                                  className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                                 >
                                   취소
                                 </button>
@@ -1030,7 +1031,7 @@ export default function ProjectWorkspacePage() {
                       setIsAddingRelation(true)
                       setRelationCreateError(null)
                     }}
-                    className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
+                    className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 max-sm:min-h-11 max-sm:min-w-11"
                   >
                     관계 추가
                   </button>
@@ -1093,7 +1094,7 @@ export default function ProjectWorkspacePage() {
                         !sourceAssetId ||
                         derivedAssetId === sourceAssetId
                       }
-                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                     >
                       {creatingRelation ? '만드는 중…' : '관계 만들기'}
                     </button>
@@ -1106,7 +1107,7 @@ export default function ProjectWorkspacePage() {
                         setSourceAssetId('')
                         setRelationCreateError(null)
                       }}
-                      className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+                      className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
                     >
                       취소
                     </button>

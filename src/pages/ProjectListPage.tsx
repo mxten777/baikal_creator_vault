@@ -89,7 +89,7 @@ export default function ProjectListPage() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700"
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 max-sm:min-h-11 max-sm:min-w-11"
             >
               로그아웃
             </button>
@@ -104,7 +104,7 @@ export default function ProjectListPage() {
               setIsCreating(true)
               setCreateError(null)
             }}
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 max-sm:min-h-11 max-sm:min-w-11"
           >
             + 새 프로젝트
           </button>
@@ -131,7 +131,7 @@ export default function ProjectListPage() {
             <button
               type="submit"
               disabled={creating || !name.trim()}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
             >
               {creating ? '만드는 중…' : '만들기'}
             </button>
@@ -143,7 +143,7 @@ export default function ProjectListPage() {
                 setName('')
                 setCreateError(null)
               }}
-              className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
+              className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
             >
               취소
             </button>

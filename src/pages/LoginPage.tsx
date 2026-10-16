@@ -102,7 +102,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+            className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60 max-sm:min-h-11 max-sm:min-w-11"
           >
             {mode === 'signin' ? '로그인' : '계정 만들기'}
           </button>
@@ -115,7 +115,7 @@ export default function LoginPage() {
             setError(null)
             setNotice(null)
           }}
-          className="mt-6 text-sm text-neutral-600 underline"
+          className="mt-6 text-sm text-neutral-600 underline max-sm:min-h-11 max-sm:min-w-11"
         >
           {mode === 'signin' ? '회원가입' : '로그인으로 돌아가기'}
         </button>
