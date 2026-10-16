@@ -21,7 +21,7 @@ export default function LoginPage() {
     setNotice(null)
 
     if (!email.trim() || !password) {
-      setError('Enter your email and password.')
+      setError('이메일과 비밀번호를 입력해 주세요.')
       return
     }
 
@@ -35,8 +35,8 @@ export default function LoginPage() {
         if (signInError) {
           setError(
             signInError.message === 'Invalid login credentials'
-              ? 'Incorrect email or password.'
-              : 'Could not sign in. Please try again.',
+              ? '이메일 또는 비밀번호를 확인해 주세요.'
+              : '로그인하지 못했습니다. 다시 시도해 주세요.',
           )
         }
       } else {
@@ -45,13 +45,13 @@ export default function LoginPage() {
           password,
         })
         if (signUpError) {
-          setError(signUpError.message || 'Could not create the account.')
+          setError(`계정을 만들지 못했습니다. 다시 시도해 주세요.${signUpError.message ? ` (상세: ${signUpError.message})` : ''}`)
         } else if (!data.session) {
-          setNotice('Check your email to confirm your account.')
+          setNotice('이메일을 확인하여 계정 인증을 완료해 주세요.')
         }
       }
     } catch {
-      setError('Network error. Please check your connection and try again.')
+      setError('네트워크 오류가 발생했습니다. 연결 상태를 확인한 후 다시 시도해 주세요.')
     } finally {
       setSubmitting(false)
     }
@@ -66,16 +66,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-full bg-neutral-50 text-neutral-900">
+    <main lang="ko" className="min-h-full bg-neutral-50 text-neutral-900 [overflow-wrap:anywhere]">
       <div className="mx-auto max-w-sm px-8 py-24">
         <h1 className="text-2xl font-semibold tracking-tight">BAIKAL Creator Vault</h1>
         <p className="mt-2 text-sm text-neutral-600">
-          {mode === 'signin' ? 'Sign in to your account' : 'Create a new account'}
+          {mode === 'signin' ? '계정에 로그인해 주세요' : '새 계정을 만들어 주세요'}
         </p>
 
         <form className="mt-10 space-y-4" onSubmit={handleSubmit}>
           <label className="block">
-            <span className="text-sm text-neutral-700">Email</span>
+            <span className="text-sm text-neutral-700">이메일</span>
             <input
               type="email"
               autoComplete="email"
@@ -86,7 +86,7 @@ export default function LoginPage() {
           </label>
 
           <label className="block">
-            <span className="text-sm text-neutral-700">Password</span>
+            <span className="text-sm text-neutral-700">비밀번호</span>
             <input
               type="password"
               autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
@@ -104,7 +104,7 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-60"
           >
-            {mode === 'signin' ? 'Sign In' : 'Create account'}
+            {mode === 'signin' ? '로그인' : '계정 만들기'}
           </button>
         </form>
 
@@ -117,7 +117,7 @@ export default function LoginPage() {
           }}
           className="mt-6 text-sm text-neutral-600 underline"
         >
-          {mode === 'signin' ? 'Create account' : 'Back to sign in'}
+          {mode === 'signin' ? '회원가입' : '로그인으로 돌아가기'}
         </button>
       </div>
     </main>

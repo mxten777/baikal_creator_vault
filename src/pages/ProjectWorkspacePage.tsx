@@ -7,8 +7,8 @@ const ASSET_CREATED_EVENT_TYPE = 'asset_created'
 const ASSET_BUCKET = 'creator-assets'
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const SIGNED_URL_TTL_SECONDS = 60
-const PASSPORT_PUBLIC_NOTICE = '공개 링크를 아는 사람은 로그인 없이 저장된 Statement·License와 Asset 이름·유형·등록 시각을 볼 수 있습니다. 원본 관계(derived_from)는 최대 1개가 제공되며, 원본 Passport가 공개 상태이면 원본 Asset 이름과 공개 식별자가, 비공개이면 비공개 표시만 제공됩니다. 프로젝트 이름과 Timeline은 공개되지 않습니다.'
-const PASSPORT_FILE_NOTICE = '원본 파일은 비공개로 유지되며 Passport 공개 링크로 열거나 다운로드할 수 없습니다. 소유자가 Download로 발급한 별도 다운로드 링크는 60초간 유효하므로 공유에 주의해 주세요.'
+const PASSPORT_PUBLIC_NOTICE = '공개 링크를 아는 사람은 로그인 없이 저장된 창작자 설명·이용 조건과 에셋 이름·유형·등록 시각을 볼 수 있습니다. 원본 관계는 최대 1개가 제공되며, 원본 패스포트가 공개 상태이면 원본 에셋 이름과 공개 식별자가, 비공개이면 비공개 표시만 제공됩니다. 프로젝트 이름과 작업 기록은 공개되지 않습니다.'
+const PASSPORT_FILE_NOTICE = '원본 파일은 비공개로 유지되며 패스포트 공개 링크로 열거나 다운로드할 수 없습니다. 소유자가 다운로드 버튼으로 발급한 별도 다운로드 링크는 60초간 유효하므로 공유에 주의해 주세요.'
 
 function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'file'
@@ -89,11 +89,11 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
     }))
 
   if (assets.length === 0) {
-    return <p className="mt-4 text-neutral-600">No assets yet.</p>
+    return <p className="mt-4 text-neutral-600">아직 에셋이 없습니다.</p>
   }
 
   if (graphEdges.length === 0) {
-    return <p className="mt-4 text-neutral-600">No relations yet. Create a relation to build the provenance graph.</p>
+    return <p className="mt-4 text-neutral-600">아직 원본·파생 관계가 없습니다. 관계를 추가하면 창작 출처를 관계도로 볼 수 있습니다.</p>
   }
 
   const childrenBySource = new Map<string, string[]>()
@@ -162,7 +162,7 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
 
   return (
     <>
-      {cycleDetected && <p className="mt-4 text-sm text-amber-700">A provenance cycle was detected and is shown below.</p>}
+      {cycleDetected && <p className="mt-4 text-sm text-amber-700">창작 출처에 순환 관계가 감지되어 아래에 표시했습니다.</p>}
       <div className="mt-4 overflow-x-auto rounded-md border border-neutral-200 bg-white">
         <div className="relative" style={{ width: graphWidth, height: graphHeight }}>
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -187,7 +187,7 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
                 <g key={edge.id} className="text-neutral-400">
                   <line x1={startX} y1={startY} x2={endX} y2={endY} stroke="currentColor" markerEnd="url(#asset-graph-arrow)" />
                   <text x={labelX} y={labelY - 4} textAnchor="middle" className="fill-neutral-500 text-[11px]">
-                    derived from
+                    원본에서 파생
                   </text>
                 </g>
               )
@@ -210,7 +210,7 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
       </div>
       {unconnectedAssets.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-sm font-medium text-neutral-700">Unconnected Assets</h3>
+          <h3 className="text-sm font-medium text-neutral-700">연결되지 않은 에셋</h3>
           <ul className="mt-2 flex flex-wrap gap-2">
             {unconnectedAssets.map((asset) => (
               <li key={asset.id} className="rounded-md border border-neutral-200 px-3 py-2 text-sm">
@@ -229,10 +229,10 @@ function AssetGraph({ assets, relations }: { assets: Asset[]; relations: AssetRe
 function getProvenanceSummary(assetId: string, relations: AssetRelation[], assetNamesById: Map<string, string>) {
   const sources = relations
     .filter((relation) => relation.relation_type === DERIVED_FROM_RELATION_TYPE && relation.from_asset_id === assetId)
-    .map((relation) => assetNamesById.get(relation.to_asset_id) ?? 'Unknown asset')
+    .map((relation) => assetNamesById.get(relation.to_asset_id) ?? '알 수 없는 에셋')
   const derivatives = relations
     .filter((relation) => relation.relation_type === DERIVED_FROM_RELATION_TYPE && relation.to_asset_id === assetId)
-    .map((relation) => assetNamesById.get(relation.from_asset_id) ?? 'Unknown asset')
+    .map((relation) => assetNamesById.get(relation.from_asset_id) ?? '알 수 없는 에셋')
   return { sources, derivatives }
 }
 
@@ -294,7 +294,7 @@ export default function ProjectWorkspacePage() {
     if (!active) return []
 
     if (error) {
-      setAssetsError(error.message)
+      setAssetsError(`에셋을 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       setAssetsLoading(false)
       return []
     }
@@ -328,7 +328,7 @@ export default function ProjectWorkspacePage() {
     if (!active) return
 
     if (error) {
-      setTimelineError(error.message)
+      setTimelineError(`작업 기록을 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
     } else {
       setTimeline(data)
     }
@@ -351,7 +351,7 @@ export default function ProjectWorkspacePage() {
     if (!active) return []
 
     if (error) {
-      setRelationsError(error.message)
+      setRelationsError(`원본·파생 관계를 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       setRelationsLoading(false)
       return []
     }
@@ -384,7 +384,7 @@ export default function ProjectWorkspacePage() {
     if (!active) return
 
     if (error) {
-      setPassportsError(error.message)
+      setPassportsError(`패스포트를 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
     } else {
       setPassports(data)
     }
@@ -397,7 +397,7 @@ export default function ProjectWorkspacePage() {
 
     async function loadWorkspace() {
       if (!projectId) {
-        setWorkspaceError('Project is not available.')
+        setWorkspaceError('프로젝트를 사용할 수 없습니다.')
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
@@ -418,7 +418,7 @@ export default function ProjectWorkspacePage() {
       if (!active) return
 
       if (error) {
-        setWorkspaceError(error.message)
+        setWorkspaceError(`프로젝트를 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
@@ -428,7 +428,7 @@ export default function ProjectWorkspacePage() {
       }
 
       if (!data) {
-        setWorkspaceError('Project not found or not accessible.')
+        setWorkspaceError('프로젝트가 없거나 접근 권한이 없습니다.')
         setWorkspaceLoading(false)
         setAssetsLoading(false)
         setTimelineLoading(false)
@@ -483,7 +483,7 @@ export default function ProjectWorkspacePage() {
       .single()
 
     if (assetError) {
-      setCreateError(assetError.message)
+      setCreateError(`에셋을 등록하지 못했습니다. 다시 시도해 주세요. (상세: ${assetError.message})`)
       setCreatingAsset(false)
       return
     }
@@ -497,7 +497,7 @@ export default function ProjectWorkspacePage() {
     if (uploadError) {
       // cleanup the asset row created above so no empty asset is left behind
       await supabase.from('assets').delete().eq('id', newAsset.id)
-      setCreateError(`File upload failed: ${uploadError.message}`)
+      setCreateError(`파일을 업로드하지 못했습니다. 다시 시도해 주세요. (상세: ${uploadError.message})`)
       setCreatingAsset(false)
       return
     }
@@ -510,7 +510,7 @@ export default function ProjectWorkspacePage() {
 
     if (pathError) {
       setCreateError(
-        `File was uploaded, but saving its path failed: ${pathError.message}. The uploaded file may be orphaned.`,
+        `파일은 업로드되었지만 파일 경로를 저장하지 못했습니다. 업로드된 파일이 에셋에 연결되지 않았을 수 있습니다. (상세: ${pathError.message})`,
       )
       setCreatingAsset(false)
       return
@@ -526,7 +526,7 @@ export default function ProjectWorkspacePage() {
     await refreshAssetsAndTimeline()
 
     if (eventError) {
-      setCreateError(`Asset was created, but its creation event failed: ${eventError.message}`)
+      setCreateError(`에셋은 등록되었지만 작업 기록을 저장하지 못했습니다. (상세: ${eventError.message})`)
       setCreatingAsset(false)
       return
     }
@@ -551,7 +551,7 @@ export default function ProjectWorkspacePage() {
         .createSignedUrl(asset.storage_path, SIGNED_URL_TTL_SECONDS, { download: filename })
 
       if (error) {
-        setDownloadError(`Could not download "${asset.name}": ${error.message}`)
+        setDownloadError(`"${asset.name}" 파일을 다운로드하지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
         return
       }
 
@@ -563,8 +563,8 @@ export default function ProjectWorkspacePage() {
       link.click()
       link.remove()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Please try again.'
-      setDownloadError(`Could not download "${asset.name}": ${message}`)
+      const message = error instanceof Error ? error.message : '다시 시도해 주세요.'
+      setDownloadError(`"${asset.name}" 파일을 다운로드하지 못했습니다. (상세: ${message})`)
     } finally {
       setDownloadPendingId(null)
     }
@@ -588,13 +588,13 @@ export default function ProjectWorkspacePage() {
 
     if (error) {
       if (error.code === '23505') {
-        setRelationCreateError('This relation already exists.')
+        setRelationCreateError('이미 등록된 원본·파생 관계입니다.')
       } else if (error.code === '23514') {
-        setRelationCreateError('An asset cannot be related to itself.')
+        setRelationCreateError('같은 에셋을 원본과 파생 대상으로 지정할 수 없습니다.')
       } else if (error.message.includes('same project')) {
-        setRelationCreateError('Assets must belong to the same project.')
+        setRelationCreateError('같은 프로젝트의 에셋끼리만 관계를 만들 수 있습니다.')
       } else {
-        setRelationCreateError(error.message)
+        setRelationCreateError(`원본·파생 관계를 만들지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       }
       setCreatingRelation(false)
       return
@@ -640,7 +640,7 @@ export default function ProjectWorkspacePage() {
       .eq('asset_id', editingPassportAssetId)
 
     if (error) {
-      setPassportSaveError(error.message)
+      setPassportSaveError(`패스포트를 저장하지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       setSavingPassport(false)
       return
     }
@@ -654,7 +654,7 @@ export default function ProjectWorkspacePage() {
 
   async function handleSetPassportVisibility(passport: Passport, isPublic: boolean) {
     if (isPublic && !window.confirm(
-      `${PASSPORT_PUBLIC_NOTICE}\n\n${PASSPORT_FILE_NOTICE}\n\nStatement·License에 개인정보나 공개하면 안 되는 내용이 없는지 확인해 주세요. 저장된 내용으로 Passport를 공개하시겠습니까?`,
+      `${PASSPORT_PUBLIC_NOTICE}\n\n${PASSPORT_FILE_NOTICE}\n\n창작자 설명·이용 조건에 개인정보나 공개하면 안 되는 내용이 없는지 확인해 주세요. 저장된 내용으로 패스포트를 공개하시겠습니까?`,
     )) return
 
     const { error } = await supabase
@@ -662,7 +662,7 @@ export default function ProjectWorkspacePage() {
       .update({ is_public: isPublic, published_at: isPublic ? new Date().toISOString() : null })
       .eq('asset_id', passport.asset_id)
     if (error) {
-      setPassportsError(error.message)
+      setPassportsError(`패스포트 공개 상태를 변경하지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       return
     }
     await loadPassports(assets)
@@ -684,18 +684,18 @@ export default function ProjectWorkspacePage() {
 
 
   return (
-    <main className="min-h-full bg-neutral-50 text-neutral-900">
+    <main lang="ko" className="min-h-full bg-neutral-50 text-neutral-900 [overflow-wrap:anywhere]">
       <div className="mx-auto max-w-5xl px-8 py-16">
         <Link to="/projects" className="text-sm text-neutral-600 underline-offset-4 hover:underline">
-          Back to Projects
+          프로젝트 목록으로 돌아가기
         </Link>
 
-        {workspaceLoading && <p className="mt-8 text-neutral-600">Loading workspace...</p>}
+        {workspaceLoading && <p className="mt-8 text-neutral-600">작업 공간을 불러오는 중…</p>}
         {workspaceError && <p className="mt-8 text-red-700">{workspaceError}</p>}
 
         {!workspaceLoading && !workspaceError && project && (
           <>
-            <div className="mt-8 flex items-center justify-between">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-3xl font-semibold tracking-tight">{project.name}</h1>
               <button
                 type="button"
@@ -705,7 +705,7 @@ export default function ProjectWorkspacePage() {
                 }}
                 className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
               >
-                Add Asset
+                에셋 추가
               </button>
             </div>
 
@@ -714,7 +714,7 @@ export default function ProjectWorkspacePage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="asset-name" className="text-sm font-medium text-neutral-700">
-                      Asset name
+                      에셋 이름
                     </label>
                     <input
                       id="asset-name"
@@ -728,7 +728,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div>
                     <label htmlFor="asset-type" className="text-sm font-medium text-neutral-700">
-                      Asset type
+                      에셋 유형
                     </label>
                     <input
                       id="asset-type"
@@ -741,7 +741,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="asset-file" className="text-sm font-medium text-neutral-700">
-                      File (max 100MB)
+                      파일 (최대 100MB)
                     </label>
                     <input
                       id="asset-file"
@@ -750,7 +750,7 @@ export default function ProjectWorkspacePage() {
                       className="mt-1 w-full text-sm text-neutral-700"
                     />
                     {assetFile && assetFile.size > MAX_FILE_SIZE_BYTES && (
-                      <p className="mt-1 text-sm text-red-700">File is larger than 100MB.</p>
+                      <p className="mt-1 text-sm text-red-700">파일 크기가 100MB를 초과합니다.</p>
                     )}
                   </div>
                 </div>
@@ -767,7 +767,7 @@ export default function ProjectWorkspacePage() {
                     }
                     className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                   >
-                    {creatingAsset ? 'Uploading...' : 'Create Asset'}
+                    {creatingAsset ? '업로드 중…' : '에셋 등록'}
                   </button>
                   <button
                     type="button"
@@ -781,34 +781,34 @@ export default function ProjectWorkspacePage() {
                     }}
                     className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                   >
-                    Cancel
+                    취소
                   </button>
                 </div>
               </form>
             )}
 
             <section className="mt-12">
-              <h2 className="text-xl font-medium">Assets</h2>
+              <h2 className="text-xl font-medium">에셋</h2>
               <div className="mt-4">
-                {assetsLoading && <p className="text-neutral-600">Loading assets...</p>}
+                {assetsLoading && <p className="text-neutral-600">에셋을 불러오는 중…</p>}
                 {assetsError && <p className="text-red-700">{assetsError}</p>}
                 {!assetsLoading && !assetsError && assets.length === 0 && (
-                  <p className="text-neutral-600">No assets yet.</p>
+                  <p className="text-neutral-600">아직 에셋이 없습니다.</p>
                 )}
                 {!assetsLoading && !assetsError && assets.length > 0 && (
                   <ul className="space-y-3">
                     {assets.map((asset) => (
                       <li key={asset.id} className="rounded-md border border-neutral-200 px-4 py-3">
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                             <p className="font-medium">{asset.name}</p>
                             <p className="mt-1 text-sm text-neutral-600">
-                              {asset.asset_type} - Created {new Date(asset.created_at).toLocaleString()}
+                              {asset.asset_type} - 등록일 {new Date(asset.created_at).toLocaleString('ko-KR')}
                             </p>
                             <p className="mt-1 text-sm text-neutral-600">
                               {asset.storage_path
-                                ? `File: ${asset.storage_path.split('/').pop()}`
-                                : 'No file attached'}
+                                ? `파일: ${asset.storage_path.split('/').pop()}`
+                                : '첨부 파일이 없습니다.'}
                             </p>
                           </div>
                           {asset.storage_path && (
@@ -818,14 +818,14 @@ export default function ProjectWorkspacePage() {
                               onClick={() => void handleOpenAssetFile(asset)}
                               className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                             >
-                              {downloadPendingId === asset.id ? 'Opening...' : 'Download'}
+                              {downloadPendingId === asset.id ? '여는 중…' : '다운로드'}
                             </button>
                           )}
                         </div>
 
                         <div className="mt-3 border-t border-neutral-200 pt-3">
-                          <div className="flex items-center justify-between gap-4">
-                            <h3 className="text-sm font-medium text-neutral-700">Passport</h3>
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <h3 className="text-sm font-medium text-neutral-700">패스포트</h3>
                             {editingPassportAssetId !== asset.id && (
                               <button
                                 type="button"
@@ -836,7 +836,7 @@ export default function ProjectWorkspacePage() {
                                 }}
                                 className="text-sm text-neutral-700 underline-offset-4 hover:underline disabled:text-neutral-400"
                               >
-                                Edit Passport
+                                패스포트 편집
                               </button>
                             )}
                           </div>
@@ -845,29 +845,29 @@ export default function ProjectWorkspacePage() {
                             <p>{PASSPORT_PUBLIC_NOTICE}</p>
                             <p>{PASSPORT_FILE_NOTICE}</p>
                           </div>
-                          {passportsLoading && <p className="mt-2 text-sm text-neutral-600">Loading passport...</p>}
+                          {passportsLoading && <p className="mt-2 text-sm text-neutral-600">패스포트를 불러오는 중…</p>}
                           {passportsError && <p className="mt-2 text-sm text-red-700">{passportsError}</p>}
                           {!passportsLoading && !passportsError && savedPassportAssetId === asset.id && (
-                            <p role="status" className="mt-2 text-sm text-green-700">Passport가 저장되었습니다.</p>
+                            <p role="status" className="mt-2 text-sm text-green-700">패스포트가 저장되었습니다.</p>
                           )}
 
                           {!passportsLoading && !passportsError && editingPassportAssetId !== asset.id && (
                             <div className="mt-2 text-sm text-neutral-700">
-                              <p>{passportsByAssetId.get(asset.id)?.data.statement || 'No statement yet'}</p>
+                              <p>{passportsByAssetId.get(asset.id)?.data.statement || '작성된 창작자 설명이 없습니다.'}</p>
                               <p className="mt-1 text-neutral-600">
-                                License: {passportsByAssetId.get(asset.id)?.data.license || 'Not specified'}
+                                이용 조건: {passportsByAssetId.get(asset.id)?.data.license || '지정된 이용 조건이 없습니다.'}
                               </p>
                               {passportsByAssetId.get(asset.id) && (
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
                                   <span className={passportsByAssetId.get(asset.id)!.is_public ? 'text-green-700' : 'text-neutral-500'}>
-                                    {passportsByAssetId.get(asset.id)!.is_public ? 'Public' : 'Private'}
+                                    {passportsByAssetId.get(asset.id)!.is_public ? '공개' : '비공개'}
                                   </span>
                                   <button type="button" className="underline" onClick={() => void handleSetPassportVisibility(passportsByAssetId.get(asset.id)!, !passportsByAssetId.get(asset.id)!.is_public)}>
-                                    {passportsByAssetId.get(asset.id)!.is_public ? 'Unpublish' : 'Publish'}
+                                    {passportsByAssetId.get(asset.id)!.is_public ? '비공개로 전환' : '공개하기'}
                                   </button>
                                   {passportsByAssetId.get(asset.id)!.is_public && (
                                     <button type="button" className="underline" onClick={() => void handleCopyPublicLink(passportsByAssetId.get(asset.id)!.public_id)}>
-                                      Copy Public Link
+                                      공개 링크 복사
                                     </button>
                                   )}
                                 </div>
@@ -907,13 +907,13 @@ export default function ProjectWorkspacePage() {
                               {(() => {
                                 const { sources, derivatives } = getProvenanceSummary(asset.id, relations, assetNamesById)
                                 if (sources.length === 0 && derivatives.length === 0) {
-                                  return <p className="mt-1 text-neutral-600">No provenance recorded yet.</p>
+                                  return <p className="mt-1 text-neutral-600">아직 기록된 창작 출처가 없습니다.</p>
                                 }
                                 return (
                                   <p className="mt-1 text-neutral-600">
-                                    {sources.length > 0 && `Derived from: ${sources.join(', ')}`}
+                                    {sources.length > 0 && `원본 에셋: ${sources.join(', ')}`}
                                     {sources.length > 0 && derivatives.length > 0 && ' · '}
-                                    {derivatives.length > 0 && `Source for: ${derivatives.join(', ')}`}
+                                    {derivatives.length > 0 && `파생 에셋: ${derivatives.join(', ')}`}
                                   </p>
                                 )
                               })()}
@@ -924,7 +924,7 @@ export default function ProjectWorkspacePage() {
                             <form onSubmit={handleSavePassport} className="mt-2 space-y-3">
                               <div>
                                 <label htmlFor={`passport-statement-${asset.id}`} className="text-sm font-medium text-neutral-700">
-                                  Statement
+                                  창작자 설명
                                 </label>
                                 <textarea
                                   id={`passport-statement-${asset.id}`}
@@ -940,7 +940,7 @@ export default function ProjectWorkspacePage() {
                               </div>
                               <div>
                                 <label htmlFor={`passport-license-${asset.id}`} className="text-sm font-medium text-neutral-700">
-                                  License
+                                  이용 조건
                                 </label>
                                 <input
                                   id={`passport-license-${asset.id}`}
@@ -956,7 +956,7 @@ export default function ProjectWorkspacePage() {
                                 </p>
                               </div>
                               <p className="text-xs text-neutral-600">
-                                저장만으로 비공개 Passport가 공개되지는 않습니다. 이미 공개 중인 Passport는 저장한 내용이 공개 링크에 바로 반영됩니다.
+                                저장만으로 비공개 패스포트가 공개되지는 않습니다. 이미 공개 중인 패스포트는 저장한 내용이 공개 링크에 바로 반영됩니다.
                               </p>
                               {passportSaveError && <p className="text-sm text-red-700">{passportSaveError}</p>}
                               <div className="flex gap-3">
@@ -965,7 +965,7 @@ export default function ProjectWorkspacePage() {
                                   disabled={savingPassport}
                                   className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                                 >
-                                  {savingPassport ? 'Saving...' : 'Save'}
+                                  {savingPassport ? '저장 중…' : '저장'}
                                 </button>
                                 <button
                                   type="button"
@@ -976,7 +976,7 @@ export default function ProjectWorkspacePage() {
                                   }}
                                   className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                                 >
-                                  Cancel
+                                  취소
                                 </button>
                               </div>
                             </form>
@@ -991,20 +991,20 @@ export default function ProjectWorkspacePage() {
             </section>
 
             <section className="mt-12">
-              <h2 className="text-xl font-medium">Timeline</h2>
+              <h2 className="text-xl font-medium">작업 기록</h2>
               <div className="mt-4">
-                {timelineLoading && <p className="text-neutral-600">Loading timeline...</p>}
+                {timelineLoading && <p className="text-neutral-600">작업 기록을 불러오는 중…</p>}
                 {timelineError && <p className="text-red-700">{timelineError}</p>}
                 {!timelineLoading && !timelineError && timeline.length === 0 && (
-                  <p className="text-neutral-600">No timeline events yet.</p>
+                  <p className="text-neutral-600">아직 작업 기록이 없습니다.</p>
                 )}
                 {!timelineLoading && !timelineError && timeline.length > 0 && (
                   <ol className="space-y-3">
                     {timeline.map((event) => (
                       <li key={event.id} className="rounded-md border border-neutral-200 px-4 py-3">
-                        <p className="font-medium">{assetNamesById.get(event.asset_id) ?? 'Unknown asset'}</p>
+                        <p className="font-medium">{assetNamesById.get(event.asset_id) ?? '알 수 없는 에셋'}</p>
                         <p className="mt-1 text-sm text-neutral-600">
-                          {event.event_type} - {new Date(event.created_at).toLocaleString()}
+                          {event.event_type === ASSET_CREATED_EVENT_TYPE ? '에셋 등록' : `기타 작업 (${event.event_type})`} - {new Date(event.created_at).toLocaleString('ko-KR')}
                         </p>
                       </li>
                     ))}
@@ -1014,15 +1014,15 @@ export default function ProjectWorkspacePage() {
             </section>
 
             <section className="mt-12">
-              <h2 className="text-xl font-medium">Graph</h2>
+              <h2 className="text-xl font-medium">관계도</h2>
               {!assetsLoading && !assetsError && !relationsLoading && !relationsError && (
                 <AssetGraph assets={assets} relations={relations} />
               )}
             </section>
 
             <section className="mt-12">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-medium">Relations</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-medium">원본·파생 관계</h2>
                 {assets.length >= 2 && (
                   <button
                     type="button"
@@ -1032,13 +1032,13 @@ export default function ProjectWorkspacePage() {
                     }}
                     className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
                   >
-                    Add Relation
+                    관계 추가
                   </button>
                 )}
               </div>
 
               {assets.length < 2 && (
-                <p className="mt-4 text-neutral-600">At least two assets are required to create a relation.</p>
+                <p className="mt-4 text-neutral-600">관계를 추가하려면 에셋이 2개 이상 필요합니다.</p>
               )}
 
               {isAddingRelation && assets.length >= 2 && (
@@ -1048,7 +1048,7 @@ export default function ProjectWorkspacePage() {
                 >
                   <div>
                     <label htmlFor="derived-asset" className="text-sm font-medium text-neutral-700">
-                      Derived Asset
+                      파생 에셋
                     </label>
                     <select
                       id="derived-asset"
@@ -1056,7 +1056,7 @@ export default function ProjectWorkspacePage() {
                       onChange={(event) => setDerivedAssetId(event.target.value)}
                       className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                     >
-                      <option value="">Select asset...</option>
+                      <option value="">에셋을 선택해 주세요</option>
                       {assets.map((asset) => (
                         <option key={asset.id} value={asset.id} disabled={asset.id === sourceAssetId}>
                           {asset.name}
@@ -1064,10 +1064,10 @@ export default function ProjectWorkspacePage() {
                       ))}
                     </select>
                   </div>
-                  <p className="mt-3 text-sm text-neutral-600">derived from</p>
+                  <p className="mt-3 text-sm text-neutral-600">아래 원본 에셋을 바탕으로 제작</p>
                   <div className="mt-3">
                     <label htmlFor="source-asset" className="text-sm font-medium text-neutral-700">
-                      Source Asset
+                      원본 에셋
                     </label>
                     <select
                       id="source-asset"
@@ -1075,7 +1075,7 @@ export default function ProjectWorkspacePage() {
                       onChange={(event) => setSourceAssetId(event.target.value)}
                       className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                     >
-                      <option value="">Select asset...</option>
+                      <option value="">에셋을 선택해 주세요</option>
                       {assets.map((asset) => (
                         <option key={asset.id} value={asset.id} disabled={asset.id === derivedAssetId}>
                           {asset.name}
@@ -1095,7 +1095,7 @@ export default function ProjectWorkspacePage() {
                       }
                       className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                     >
-                      {creatingRelation ? 'Creating...' : 'Create Relation'}
+                      {creatingRelation ? '만드는 중…' : '관계 만들기'}
                     </button>
                     <button
                       type="button"
@@ -1108,29 +1108,29 @@ export default function ProjectWorkspacePage() {
                       }}
                       className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
                     >
-                      Cancel
+                      취소
                     </button>
                   </div>
                 </form>
               )}
 
               <div className="mt-4">
-                {relationsLoading && <p className="text-neutral-600">Loading relations...</p>}
+                {relationsLoading && <p className="text-neutral-600">원본·파생 관계를 불러오는 중…</p>}
                 {relationsError && <p className="text-red-700">{relationsError}</p>}
                 {!relationsLoading && !relationsError && relations.length === 0 && (
-                  <p className="text-neutral-600">No relations yet.</p>
+                  <p className="text-neutral-600">아직 원본·파생 관계가 없습니다.</p>
                 )}
                 {!relationsLoading && !relationsError && relations.length > 0 && (
                   <ul className="space-y-3">
                     {relations.map((relation) => (
                       <li key={relation.id} className="rounded-md border border-neutral-200 px-4 py-3">
                         <p className="font-medium">
-                          {assetNamesById.get(relation.from_asset_id) ?? 'Unknown asset'}
+                          {assetNamesById.get(relation.from_asset_id) ?? '알 수 없는 에셋'}
                         </p>
-                        <p className="mt-1 text-sm text-neutral-600">derived from</p>
-                        <p className="font-medium">{assetNamesById.get(relation.to_asset_id) ?? 'Unknown asset'}</p>
+                        <p className="mt-1 text-sm text-neutral-600">아래 원본 에셋을 바탕으로 제작</p>
+                        <p className="font-medium">{assetNamesById.get(relation.to_asset_id) ?? '알 수 없는 에셋'}</p>
                         <p className="mt-1 text-sm text-neutral-600">
-                          Created {new Date(relation.created_at).toLocaleString()}
+                          등록일 {new Date(relation.created_at).toLocaleString('ko-KR')}
                         </p>
                       </li>
                     ))}

@@ -18,8 +18,8 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
 
 export function AuthLoading() {
   return (
-    <main className="flex min-h-full items-center justify-center bg-neutral-50">
-      <p className="text-sm text-neutral-500">Loading...</p>
+    <main lang="ko" className="flex min-h-full items-center justify-center bg-neutral-50">
+      <p className="text-sm text-neutral-500">불러오는 중…</p>
     </main>
   )
 }

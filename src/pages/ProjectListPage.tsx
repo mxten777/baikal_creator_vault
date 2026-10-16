@@ -34,7 +34,7 @@ export default function ProjectListPage() {
       if (!active) return
 
       if (error) {
-        setFetchError(error.message)
+        setFetchError(`프로젝트를 불러오지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
       } else {
         setProjects(data)
       }
@@ -69,7 +69,7 @@ export default function ProjectListPage() {
       .single()
 
     if (error) {
-      setCreateError(error.message)
+      setCreateError(`프로젝트를 만들지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
     } else {
       setProjects((currentProjects) => [data, ...currentProjects])
       setName('')
@@ -80,24 +80,24 @@ export default function ProjectListPage() {
   }
 
   return (
-    <main className="min-h-full bg-neutral-50 text-neutral-900">
+    <main lang="ko" className="min-h-full bg-neutral-50 text-neutral-900 [overflow-wrap:anywhere]">
       <div className="mx-auto max-w-5xl px-8 py-16">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight">BAIKAL Creator Vault</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-4">
             <span className="text-sm text-neutral-600">{user?.email}</span>
             <button
               type="button"
               onClick={handleSignOut}
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700"
             >
-              Sign Out
+              로그아웃
             </button>
           </div>
         </div>
 
-        <div className="mt-12 flex items-center justify-between">
-          <h2 className="text-xl font-medium">Projects</h2>
+        <div className="mt-12 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-medium">프로젝트</h2>
           <button
             type="button"
             onClick={() => {
@@ -106,15 +106,15 @@ export default function ProjectListPage() {
             }}
             className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700"
           >
-            + New Project
+            + 새 프로젝트
           </button>
         </div>
 
         {isCreating && (
-          <form onSubmit={handleCreate} className="mt-8 flex max-w-md items-start gap-3">
-            <div className="flex-1">
+          <form onSubmit={handleCreate} className="mt-8 flex max-w-md flex-wrap items-start gap-3">
+            <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
               <label htmlFor="project-name" className="sr-only">
-                Project name
+                프로젝트 이름
               </label>
               <input
                 id="project-name"
@@ -123,7 +123,7 @@ export default function ProjectListPage() {
                 onChange={(event) => setName(event.target.value)}
                 maxLength={200}
                 autoFocus
-                placeholder="Project name"
+                placeholder="프로젝트 이름"
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
               />
               {createError && <p className="mt-2 text-sm text-red-700">{createError}</p>}
@@ -133,7 +133,7 @@ export default function ProjectListPage() {
               disabled={creating || !name.trim()}
               className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
             >
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? '만드는 중…' : '만들기'}
             </button>
             <button
               type="button"
@@ -145,16 +145,16 @@ export default function ProjectListPage() {
               }}
               className="px-3 py-2 text-sm text-neutral-700 disabled:text-neutral-400"
             >
-              Cancel
+              취소
             </button>
           </form>
         )}
 
         <div className="mt-8">
-          {loading && <p className="text-neutral-600">Loading projects...</p>}
+          {loading && <p className="text-neutral-600">프로젝트를 불러오는 중…</p>}
           {fetchError && <p className="text-red-700">{fetchError}</p>}
           {!loading && !fetchError && projects.length === 0 && (
-            <p className="text-neutral-600">No projects yet.</p>
+            <p className="text-neutral-600">아직 프로젝트가 없습니다.</p>
           )}
           {!loading && !fetchError && projects.length > 0 && (
             <ul className="space-y-3">
@@ -167,7 +167,7 @@ export default function ProjectListPage() {
                     {project.name}
                   </Link>
                   <p className="mt-1 text-sm text-neutral-600">
-                    Created {new Date(project.created_at).toLocaleDateString()}
+                    생성일 {new Date(project.created_at).toLocaleDateString('ko-KR')}
                   </p>
                 </li>
               ))}
