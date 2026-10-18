@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/useAuth'
@@ -265,6 +265,9 @@ export default function ProjectWorkspacePage() {
   const [sourceAssetId, setSourceAssetId] = useState('')
   const [creatingRelation, setCreatingRelation] = useState(false)
   const [relationCreateError, setRelationCreateError] = useState<string | null>(null)
+  const [deletingRelationId, setDeletingRelationId] = useState<string | null>(null)
+  const [relationDeleteError, setRelationDeleteError] = useState<string | null>(null)
+  const relationDeletePending = useRef(false)
   const [passports, setPassports] = useState<Passport[]>([])
   const [passportsLoading, setPassportsLoading] = useState(true)
   const [passportsError, setPassportsError] = useState<string | null>(null)
@@ -607,6 +610,52 @@ export default function ProjectWorkspacePage() {
     setSourceAssetId('')
     setIsAddingRelation(false)
     setCreatingRelation(false)
+  }
+
+  async function handleDeleteRelation(relation: AssetRelation) {
+    if (!projectId || relationDeletePending.current || relation.relation_type !== DERIVED_FROM_RELATION_TYPE) return
+
+    setRelationDeleteError(null)
+    const derivedAsset = assets.find((asset) => asset.id === relation.from_asset_id)
+    const sourceAsset = assets.find((asset) => asset.id === relation.to_asset_id)
+    if (!derivedAsset || !sourceAsset) {
+      setRelationDeleteError('관계의 에셋 정보를 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.')
+      return
+    }
+
+    relationDeletePending.current = true
+    try {
+      if (!window.confirm(
+        `다음 원본·파생 관계를 삭제하시겠습니까?\n\n파생 에셋: ${derivedAsset.name}\n원본 에셋: ${sourceAsset.name}\n\n관계만 삭제됩니다. 에셋·파일·패스포트·작업 기록은 유지되지만 창작 출처 표시는 변경됩니다.`,
+      )) return
+
+      setDeletingRelationId(relation.id)
+      const { data, error } = await supabase
+        .from('asset_relations')
+        .delete()
+        .eq('id', relation.id)
+        .eq('project_id', projectId)
+        .eq('relation_type', DERIVED_FROM_RELATION_TYPE)
+        .select('id')
+
+      if (error) {
+        setRelationDeleteError(`관계를 삭제하지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
+        return
+      }
+      if (!data || data.length !== 1 || data[0].id !== relation.id) {
+        setRelationDeleteError('삭제된 관계를 확인하지 못했습니다. 이미 삭제되었거나 삭제 권한이 없을 수 있습니다. 페이지를 새로고침한 뒤 다시 확인해 주세요.')
+        return
+      }
+
+      setRelations((current) => current.filter((item) => item.id !== relation.id))
+      await loadRelations()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '알 수 없는 오류'
+      setRelationDeleteError(`관계 삭제 결과를 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 확인해 주세요. (상세: ${message})`)
+    } finally {
+      relationDeletePending.current = false
+      setDeletingRelationId(null)
+    }
   }
 
   function handleOpenPassportEditor(passport: Passport) {
@@ -1118,6 +1167,7 @@ export default function ProjectWorkspacePage() {
               <div className="mt-4">
                 {relationsLoading && <p className="text-neutral-600">원본·파생 관계를 불러오는 중…</p>}
                 {relationsError && <p className="text-red-700">{relationsError}</p>}
+                {relationDeleteError && <p role="alert" className="mb-3 text-sm text-red-700">{relationDeleteError}</p>}
                 {!relationsLoading && !relationsError && relations.length === 0 && (
                   <p className="text-neutral-600">아직 원본·파생 관계가 없습니다.</p>
                 )}
@@ -1133,6 +1183,16 @@ export default function ProjectWorkspacePage() {
                         <p className="mt-1 text-sm text-neutral-600">
                           등록일 {new Date(relation.created_at).toLocaleString('ko-KR')}
                         </p>
+                        {relation.relation_type === DERIVED_FROM_RELATION_TYPE && (
+                          <button
+                            type="button"
+                            disabled={deletingRelationId !== null || creatingRelation || assetsLoading || assetsError !== null}
+                            onClick={() => void handleDeleteRelation(relation)}
+                            className="mt-3 rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 disabled:text-neutral-400 max-sm:min-h-11 max-sm:min-w-11"
+                          >
+                            {deletingRelationId === relation.id ? '삭제 중…' : '관계 삭제'}
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
