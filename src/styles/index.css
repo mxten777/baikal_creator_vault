@@ -5,3 +5,116 @@ body,
 #root {
   height: 100%;
 }
+
+.project-print-report {
+  display: none;
+}
+
+@page vault-report {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
+@media print {
+  body:has(.project-workspace),
+  body:has(.project-workspace) #root {
+    height: auto;
+  }
+
+  .project-workspace {
+    page: vault-report;
+    min-height: 0;
+    background: white;
+    color: black;
+  }
+
+  .project-workspace .workspace-screen {
+    display: none !important;
+  }
+
+  .project-print-report {
+    display: block;
+    font: 10pt/1.5 sans-serif;
+    overflow-wrap: anywhere;
+  }
+
+  .project-print-report h1 {
+    margin: 3mm 0;
+    font-size: 20pt;
+  }
+
+  .project-print-report h2 {
+    margin: 7mm 0 3mm;
+    font-size: 14pt;
+  }
+
+  .project-print-report h3 {
+    margin: 5mm 0 2mm;
+    font-size: 12pt;
+  }
+
+  .project-print-report h1,
+  .project-print-report h2,
+  .project-print-report h3,
+  .project-print-report dt {
+    break-after: avoid;
+  }
+
+  .project-print-report p,
+  .project-print-report dd {
+    margin: 0 0 2mm;
+    white-space: pre-wrap;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .project-print-report dt {
+    font-weight: bold;
+  }
+
+  .project-print-report table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .project-print-report .print-asset {
+    break-inside: avoid-page;
+  }
+
+  .project-print-report thead {
+    display: table-header-group;
+  }
+
+  .project-print-report .print-asset th,
+  .project-print-report .print-asset td {
+    border: 0;
+    padding: 0;
+  }
+
+  .project-print-report .print-asset h3 {
+    margin: 5mm 0 2mm;
+  }
+
+  .project-print-report th,
+  .project-print-report td {
+    border: 0.2mm solid #888;
+    padding: 2mm;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .project-print-report th:first-child {
+    width: 12mm;
+  }
+
+  .project-print-report tr,
+  .project-print-report li {
+    break-inside: avoid;
+  }
+
+  .project-print-report ul {
+    padding-left: 5mm;
+    list-style: disc;
+  }
+}

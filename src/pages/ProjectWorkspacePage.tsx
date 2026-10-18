@@ -282,6 +282,8 @@ export default function ProjectWorkspacePage() {
     url: string
     copied: boolean
   } | null>(null)
+  const reportDateRef = useRef<HTMLTimeElement | null>(null)
+  const [updatingVisibility, setUpdatingVisibility] = useState(false)
 
   const loadAssets = useCallback(async (active = true) => {
     if (!projectId) return []
@@ -456,6 +458,18 @@ export default function ProjectWorkspacePage() {
       active = false
     }
   }, [loadAssets, loadTimeline, loadRelations, loadPassports, projectId])
+
+  useEffect(() => {
+    function updateReportDate() {
+      const now = new Date()
+      if (reportDateRef.current) {
+        reportDateRef.current.dateTime = now.toISOString()
+        reportDateRef.current.textContent = now.toLocaleString('ko-KR')
+      }
+    }
+    window.addEventListener('beforeprint', updateReportDate)
+    return () => window.removeEventListener('beforeprint', updateReportDate)
+  }, [])
 
   async function refreshAssetsAndTimeline() {
     const currentAssets = await loadAssets()
@@ -703,19 +717,23 @@ export default function ProjectWorkspacePage() {
   }
 
   async function handleSetPassportVisibility(passport: Passport, isPublic: boolean) {
+    if (updatingVisibility) return
     if (isPublic && !window.confirm(
       `${PASSPORT_PUBLIC_NOTICE}\n\n${PASSPORT_FILE_NOTICE}\n\n창작자 설명·이용 조건에 개인정보나 공개하면 안 되는 내용이 없는지 확인해 주세요. 저장된 내용으로 패스포트를 공개하시겠습니까?`,
     )) return
 
+    setUpdatingVisibility(true)
     const { error } = await supabase
       .from('passports')
       .update({ is_public: isPublic, published_at: isPublic ? new Date().toISOString() : null })
       .eq('asset_id', passport.asset_id)
     if (error) {
       setPassportsError(`패스포트 공개 상태를 변경하지 못했습니다. 다시 시도해 주세요. (상세: ${error.message})`)
+      setUpdatingVisibility(false)
       return
     }
     await loadPassports(assets)
+    setUpdatingVisibility(false)
   }
 
   async function handleCopyPublicLink(publicId: string) {
@@ -731,11 +749,26 @@ export default function ProjectWorkspacePage() {
 
   const assetNamesById = new Map(assets.map((asset) => [asset.id, asset.name]))
   const passportsByAssetId = new Map(passports.map((passport) => [passport.asset_id, passport]))
+  const reportLoading = workspaceLoading || assetsLoading || timelineLoading || relationsLoading || passportsLoading
+  const reportError = workspaceError || assetsError || timelineError || relationsError || passportsError
+  const reportIncomplete = assets.some((asset) => !passportsByAssetId.has(asset.id)) ||
+    relations.some((relation) => !assetNamesById.has(relation.from_asset_id) || !assetNamesById.has(relation.to_asset_id))
+  const reportBusy = creatingAsset || creatingRelation || deletingRelationId !== null || savingPassport || updatingVisibility
+  const canPrintReport = !!user && project?.id === projectId && !!project &&
+    !reportLoading && !reportError && !reportIncomplete && !reportBusy
+  const reportStatus = reportLoading
+    ? '보고서 데이터를 불러오는 중에는 인쇄할 수 없습니다.'
+    : reportError || reportIncomplete
+      ? '보고서 조회 오류 또는 누락된 데이터가 있습니다. 새로고침 후 다시 시도해 주세요.'
+      : reportBusy
+        ? '저장 작업이 끝난 뒤 인쇄해 주세요.'
+        : '소유자용 전체 보고서에는 비공개 Passport도 포함됩니다. 외부 공유에 주의해 주세요. 저장된 데이터만 출력하며, 파일 URL과 저장 경로는 포함하지 않습니다.'
+  const reportAssets = [...assets].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
 
 
   return (
-    <main lang="ko" className="min-h-full bg-neutral-50 text-neutral-900 [overflow-wrap:anywhere]">
-      <div className="mx-auto max-w-5xl px-8 py-16">
+    <main lang="ko" className="project-workspace min-h-full bg-neutral-50 text-neutral-900 [overflow-wrap:anywhere]">
+      <div className="workspace-screen mx-auto max-w-5xl px-8 py-16">
         <Link to="/projects" className="text-sm text-neutral-600 underline-offset-4 hover:underline">
           프로젝트 목록으로 돌아가기
         </Link>
@@ -757,6 +790,22 @@ export default function ProjectWorkspacePage() {
               >
                 에셋 추가
               </button>
+            </div>
+
+            <div className="mt-4">
+              <button
+                type="button"
+                disabled={!canPrintReport}
+                aria-describedby="report-status"
+                onClick={() => {
+                  if (canPrintReport) window.print()
+                }}
+                className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 disabled:text-neutral-400 max-sm:min-h-11"
+              >
+                전체 보고서 인쇄 / PDF 저장
+              </button>
+              <p id="report-status" role="status" className="mt-2 text-sm text-neutral-600">{reportStatus}</p>
+              <p className="mt-1 text-xs text-neutral-600">인쇄창에서 A4와 PDF 저장을 선택하세요. 브라우저 머리글·바닥글은 꺼 주세요.</p>
             </div>
 
             {isAddingAsset && (
@@ -1202,6 +1251,81 @@ export default function ProjectWorkspacePage() {
           </>
         )}
       </div>
+      <article className="project-print-report" aria-label="소유자용 프로젝트 전체 보고서">
+        {!canPrintReport ? (
+          <p>보고서를 인쇄할 수 없습니다. 조회와 저장 작업이 완료되었는지 작업공간에서 확인해 주세요.</p>
+        ) : (
+          <>
+            <header>
+              <p>BAIKAL Creator Vault · 소유자용 전체 보고서 · 비공개 포함</p>
+              <h1>{project.name}</h1>
+              <p>출력일: <time ref={reportDateRef}>{new Date().toLocaleString('ko-KR')}</time></p>
+              <p>등록 에셋·버전: {assets.length}개 / 관계: {relations.length}개</p>
+              <p>진행 중인 프로젝트의 현재 저장 내용입니다. 각 에셋을 하나의 등록 항목으로 집계하며, 별도 버전 번호나 완성 여부를 추정하지 않습니다.</p>
+            </header>
+            <section>
+              <h2>전체 에셋 목록</h2>
+              {reportAssets.length === 0 ? <p>아직 등록된 에셋이 없습니다.</p> : (
+                <table>
+                  <thead><tr><th scope="col">항목</th><th scope="col">에셋 이름</th><th scope="col">유형</th><th scope="col">등록일</th></tr></thead>
+                  <tbody>
+                    {reportAssets.map((asset, index) => (
+                      <tr key={asset.id}>
+                        <td>{index + 1}</td><td>{asset.name}</td><td>{asset.asset_type}</td>
+                        <td>{new Date(asset.created_at).toLocaleString('ko-KR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+            <section>
+              <h2>원작·파생 관계</h2>
+              {relations.length === 0 ? <p>아직 등록된 관계가 없습니다.</p> : (
+                <ul>
+                  {relations.map((relation) => (
+                    <li key={relation.id}>
+                      {relation.relation_type === DERIVED_FROM_RELATION_TYPE
+                        ? <>원본: {assetNamesById.get(relation.to_asset_id)} → 파생: {assetNamesById.get(relation.from_asset_id)}</>
+                        : <>{assetNamesById.get(relation.from_asset_id)} → {assetNamesById.get(relation.to_asset_id)} (관계 유형: {relation.relation_type})</>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section>
+              <h2>버전별 제작자료·음원 정보와 Passport</h2>
+              <p>등록된 에셋 이름·유형·첨부 여부만 표시합니다. 재생시간·코덱 등 별도 저장되지 않은 음원 정보는 추정하지 않습니다.</p>
+              {reportAssets.map((asset, index) => {
+                const passport = passportsByAssetId.get(asset.id)!
+                const { sources, derivatives } = getProvenanceSummary(asset.id, relations, assetNamesById)
+                return (
+                  <table key={asset.id} className="print-asset">
+                    <thead>
+                      <tr><th scope="col"><h3>{index + 1}. {asset.name}</h3></th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <dl>
+                            <dt>제작자료·음원 유형</dt><dd>{asset.asset_type}</dd>
+                            <dt>파일 첨부</dt><dd>{asset.storage_path ? '첨부됨 (원본 파일 비공개)' : '첨부 파일 없음'}</dd>
+                            <dt>원본</dt><dd>{sources.length ? sources.join(', ') : '원본 관계 미등록'}</dd>
+                            <dt>파생</dt><dd>{derivatives.length ? derivatives.join(', ') : '파생 관계 미등록'}</dd>
+                            <dt>Passport 공개 상태</dt><dd>{passport.is_public ? '공개' : '비공개'}</dd>
+                            <dt>창작자 설명</dt><dd>{passport.data.statement || '작성된 창작자 설명이 없습니다.'}</dd>
+                            <dt>이용 조건</dt><dd>{passport.data.license || '지정된 이용 조건이 없습니다.'}</dd>
+                          </dl>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )
+              })}
+            </section>
+          </>
+        )}
+      </article>
     </main>
   )
 }
